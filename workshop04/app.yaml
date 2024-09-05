@@ -17,24 +17,6 @@
 #     targetPort: 9090
 
 ---
-apiVersion: v1
-kind: Service
-metadata:
-  name: minio-hsvc
-spec:
-  type: ClusterIP
-  selector:
-    app: minio
-    name: minio-po
-  ports:
-  - port: 9000
-    name: data
-    targetPort: 9000
-  - port: 9090
-    name: console
-    targetPort: 9090
-
----
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -54,12 +36,11 @@ spec:
   - metadata:
       name: data-vol
     spec:
-      accessModes:
-      - ReadWriteOnce
+      accessModes: [ ReadWriteOnce ]
+      storageClassName: do-block-storage
       resources:
         requests:
           storage: 1Gi
-      storageClassName: do-block-storage
   template:
     metadata:
       labels:
@@ -83,15 +64,32 @@ spec:
           initialDelaySeconds: 60
           periodSeconds: 30
         ports:
-        - containerPort: 9000
-        - containerPort: 9090
-        resources:
-          requests:
-            cpu: 200m
-            memory: 256Mi
+        - name: data
+          containerPort: 9000
+        - name: console
+          containerPort: 9090
         volumeMounts:
         - name: data-vol
           mountPath: /data
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio-svc
+  namespace: minio-ns
+spec:
+  type: ClusterIP
+  selector:
+    app: minio
+    name: minio-po
+  ports:
+  - name: data
+    port: 9000
+    targetPort: 9000
+  - name: console
+    port: 9090
+    targetPort: 9090
 
 ---
 apiVersion: networking.k8s.io/v1
@@ -99,9 +97,6 @@ kind: Ingress
 metadata:
   name: minio-ing
   namespace: minio-ns
-  labels: 
-    app: minio
-    name: minio-ing
 spec:
   ingressClassName: nginx
   rules:
